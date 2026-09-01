@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 import threading
 import time
 import traceback
-from datetime import datetime, timedelta
 
 from backend.core.db import get_db, engine, Base, SessionLocal
 from backend.core.config import settings
@@ -95,48 +94,6 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     # Calculate detections count
     detections_count = sum(len(i.evidence) if i.evidence else 0 for i in incidents)
     
-    # Generate Real Timeline for Graph (Cumulative, last 15 minutes)
-    now = datetime.utcnow()
-    fifteen_mins_ago = now - timedelta(minutes=15)
-    
-    # Calculate base counts before the 15 min window
-    base_events = db.query(NormalizedEvent).filter(NormalizedEvent.timestamp < fifteen_mins_ago).count()
-    base_alerts = sum(1 for i in incidents if getattr(i, "detected_at", now) and getattr(i, "detected_at", now) < fifteen_mins_ago)
-    
-    # Fetch recent events
-    recent_events = db.query(NormalizedEvent).filter(NormalizedEvent.timestamp >= fifteen_mins_ago).all()
-    recent_incidents = [i for i in incidents if getattr(i, "detected_at", now) and getattr(i, "detected_at", now) >= fifteen_mins_ago]
-    
-    # Bucket by minute
-    timeline_dict = {}
-    for i in range(15):
-        t_bucket = (fifteen_mins_ago + timedelta(minutes=i)).strftime("%H:%M")
-        timeline_dict[t_bucket] = {"time": t_bucket, "events": 0, "alerts": 0}
-        
-    for ev in recent_events:
-        t_str = ev.timestamp.strftime("%H:%M")
-        if t_str in timeline_dict:
-            timeline_dict[t_str]["events"] += 1
-            
-    for inc in recent_incidents:
-        if getattr(inc, "detected_at", None):
-            t_str = inc.detected_at.strftime("%H:%M")
-            if t_str in timeline_dict:
-                timeline_dict[t_str]["alerts"] += 1
-                
-    # Transform to cumulative list
-    timeline_list = []
-    current_events = base_events
-    current_alerts = base_alerts
-    for t_bucket, counts in timeline_dict.items():
-        current_events += counts["events"]
-        current_alerts += counts["alerts"]
-        timeline_list.append({
-            "time": t_bucket,
-            "events": current_events,
-            "alerts": current_alerts
-        })
-    
     return {
         "total_events": total_events,
         "active_incidents": active_incidents,
@@ -145,8 +102,7 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             "high": sum(1 for i in incidents if i.risk_score and i.risk_score >= 80),
             "medium": sum(1 for i in incidents if i.risk_score and 40 <= i.risk_score < 80),
             "low": sum(1 for i in incidents if i.risk_score is not None and i.risk_score < 40)
-        },
-        "timeline": timeline_list
+        }
     }
 
 
@@ -377,39 +333,129 @@ def get_simulation_status():
 
 @app.get("/api/incidents/{incident_id}/report")
 def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
+    from fpdf import FPDF
+    from fastapi.responses import Response
+    import textwrap
+    import re
+    
     manager = IncidentManager(db)
     incident = manager.get_incident(incident_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
         
-    report = f"# Incident Report: {incident.title}\n\n"
-    report += f"**Incident ID:** {incident.incident_id}\n"
-    report += f"**Risk Score:** {incident.risk_score}\n"
-    report += f"**Status:** {incident.status}\n"
-    report += f"**Severity:** {incident.severity}\n"
-    report += f"**Threat Type:** {incident.threat_type}\n\n"
+    def sanitize(text):
+        if not text:
+            return ""
+        text = str(text)
+        replacements = {
+            '\u2018': "'", '\u2019': "'", '\u201c': '"', '\u201d': '"',
+            '\u2013': '-', '\u2014': '-', '\u2026': '...', '\u2022': '-'
+        }
+        for k, v in replacements.items():
+            text = text.replace(k, v)
+        text = text.encode('latin-1', 'replace').decode('latin-1')
+        return textwrap.fill(text, width=95, break_long_words=True, replace_whitespace=False)
     
-    report += f"## AI Summary\n{incident.ai_summary or 'N/A'}\n\n"
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
     
-    report += f"## Affected Assets\n"
+    # Title
+    pdf.set_font("Helvetica", "B", 18)
+    pdf.cell(0, 12, "ADNEXUS - Incident Report", ln=True, align="C")
+    pdf.ln(4)
+    
+    # Incident ID & Meta
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, f"Incident: {incident.incident_id}", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    pdf.multi_cell(0, 6, sanitize(f"Title: {incident.title}"))
+    pdf.multi_cell(0, 6, sanitize(f"Severity: {incident.severity}  |  Risk Score: {incident.risk_score}/100  |  Status: {incident.status}"))
+    pdf.multi_cell(0, 6, sanitize(f"Threat Type: {incident.threat_type}"))
+    pdf.multi_cell(0, 6, sanitize(f"Detected At: {incident.detected_at}"))
+    pdf.ln(6)
+    
+    # AI Summary
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "AI Investigation Summary", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    summary = incident.ai_summary or "No AI summary available."
+    for line in str(summary).split('\n'):
+        if line.strip():
+            pdf.multi_cell(0, 6, sanitize(line.strip()))
+    pdf.ln(4)
+    
+    # Affected Assets
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Affected Assets", ln=True)
+    pdf.set_font("Helvetica", "", 10)
     if incident.affected_assets:
         for asset in incident.affected_assets:
-            report += f"- {asset}\n"
+            pdf.multi_cell(0, 6, sanitize(f"  - {asset}"))
+    else:
+        pdf.cell(0, 6, "  None identified", ln=True)
+    pdf.ln(4)
     
-    report += f"\n## Evidence Timeline\n"
+    # MITRE ATT&CK
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "MITRE ATT&CK Mapping", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    if incident.mitre_mapping:
+        for tactic in incident.mitre_mapping:
+            pdf.multi_cell(0, 6, sanitize(f"  - {tactic}"))
+    else:
+        pdf.cell(0, 6, "  No MITRE mapping available", ln=True)
+    pdf.ln(4)
+    
+    # Detection Evidence
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Detection Evidence", ln=True)
+    pdf.set_font("Helvetica", "", 10)
     if incident.evidence:
-        for i, ev in enumerate(incident.evidence[:10], 1):
+        for i, ev in enumerate(incident.evidence[:15], 1):
             if isinstance(ev, dict):
-                report += f"- [{ev.get('engine', 'N/A')}] {ev.get('threat_class', 'N/A')} (confidence: {ev.get('confidence', 'N/A')})\n"
+                line = f"  {i}. [{ev.get('engine', 'N/A')}] {ev.get('threat_class', 'N/A')} (conf: {ev.get('confidence', 'N/A')})"
             else:
-                report += f"- {ev}\n"
+                line = f"  {i}. {ev}"
+            pdf.multi_cell(0, 6, sanitize(line))
+    else:
+        pdf.cell(0, 6, "  No evidence recorded", ln=True)
+    pdf.ln(4)
     
-    report += f"\n## Response Recommendations\n"
+    # Response Recommendations
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Response Recommendations", ln=True)
+    pdf.set_font("Helvetica", "", 10)
     if incident.response_recommendations:
         for rec in incident.response_recommendations:
-            report += f"- {rec}\n"
-            
-    return {"report": report}
+            pdf.multi_cell(0, 6, sanitize(f"  - {rec}"))
+    else:
+        pdf.cell(0, 6, "  No recommendations available", ln=True)
+    pdf.ln(4)
+    
+    # Event Timeline Count
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Event Timeline", ln=True)
+    pdf.set_font("Helvetica", "", 10)
+    timeline_count = len(incident.event_timeline) if incident.event_timeline else 0
+    pdf.cell(0, 6, f"  Total Correlated Events: {timeline_count}", ln=True)
+    
+    # Footer
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "I", 8)
+    pdf.cell(0, 6, "Generated by ADNEXUS Agentic SOC - The S.H.I.E.L.D", ln=True, align="C")
+    
+    try:
+        pdf_bytes = pdf.output()
+    except Exception as e:
+        print(f"PDF Error: {e}")
+        return Response(content=f"PDF Error: {e}", status_code=500)
+    
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=incident_{incident.incident_id}.pdf"}
+    )
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

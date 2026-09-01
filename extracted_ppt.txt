@@ -1,0 +1,209 @@
+=== SLIDE 1 (ppt/slides/slide1.xml) ===
+SMART INDIA HACKATHON 2026
+Problem Statement ID - SIH26-S01
+Problem Statement Title - 
+Agentic AI Cybersecurity Assistant for Automated Threat Investigation and Incident Response
+Theme – Blockchain & Cyber Security
+PS Category – Software
+Team ID – COMP26
+Team Name – 
+ The S.H.I.E.L.D
+ADNEXUS
+
+========================================
+
+=== SLIDE 2 (ppt/slides/slide2.xml) ===
+2
+ADNEXUS
+THE
+S.H.I.E.L.D
+Develop an Agentic AI cybersecurity assistant that ingests and normalizes security logs, detects and correlates suspicious activities through hybrid ML and rule-based analysis, and uses collaborating AI agents to investigate threats, explain evidence, recommend response actions, and generate incident reports.
+Intelligent Log Ingestion & Normalization:
+Ingests heterogeneous security logs from endpoints, servers and network sources, transforming raw events into a standardized format for unified analysis.
+Hybrid Threat Detection Engine:
+Combines deterministic security rules with ML-based anomaly detection to identify both known threats and previously unseen suspicious behaviour.
+Multi-Agent Investigation Core:
+➢ 
+Log Analysis Agent:
+ Extracts suspicious events, identifies indicators and summarizes relevant evidence.
+➢ 
+Threat Investigation Agent:
+ Correlates related events across users, hosts, IPs and timelines to reconstruct potential attack chains.
+➢ 
+Response Recommendation Agent:
+ Determines appropriate containment and remediation actions based on threat severity and evidence.
+Automated SOC Intelligence:
+Generates risk-scored incidents with evidence-backed explanations, MITRE ATT&CK mapping, recommended actions and downloadable incident reports through a real-time dashboard.
+Collaborative Agentic SOC:
+Unlike conventional SIEM/IDS solutions that primarily generate alerts, ADNEXUS uses specialized AI agents that 
+collaborate to investigate and reason over security incidents.
+Multi-Layer Threat Intelligence:
+Fuses 
+rules + anomaly detection + behavioural analysis + event correlation
+ to improve detection accuracy while reducing alert fatigue.
+Evidence-Grounded AI Investigation:
+Every AI conclusion is tied to actual security events, timestamps, entities and detection evidence, reducing unsupported AI-generated conclusions.
+Attack-Chain Correlation:
+Builds relationships between seemingly isolated events to identify 
+multi-stage attacks, lateral movement and coordinated malicious behaviour.
+Agent-in-the-Loop Response:
+AI recommends containment and remediation actions while keeping the 
+final decision with the security analyst
+, ensuring safe and controlled incident response.
+Proposed Solution
+Innovation / Uniqueness
+style.visibility
+style.visibility
+style.visibility
+
+========================================
+
+=== SLIDE 3 (ppt/slides/slide3.xml) ===
+3
+ADNEXUS
+THE
+S.H.I.E.L.D
+Technical
+Approach
+-
+Technical
+Stack
+User Interface
+React.js + Vite
+Tailwind CSS
+Web Sockets
+ML Frameworks
+LangGraph
+PyTorch
+ & 
+PyG
+Isolation Forest
+Backend
+Python - 
+Uvicorn
+PostgreSQL
+Flask
+Security Mods.
+GraphSAGE
+MITRE 
+Att&ck
+ DS
+Flow Probes
+style.visibility
+style.visibility
+style.visibility
+style.visibility
+style.visibility
+style.visibility
+
+========================================
+
+=== SLIDE 4 (ppt/slides/slide4.xml) ===
+4
+ADNEXUS
+THE
+S.H.I.E.L.D
+Feasibility – Challenges &
+Risks
+{3C2FFA5D-87B4-456A-9821-1D502468CF0F}
+Challenges & Risk Area
+Description & Threat Impact
+1. Heterogeneous Log Sources
+Different log formats complicate normalization, feature extraction and unified threat analysis.
+2. False Positives & Alert Fatigue
+Legitimate behavioural changes may trigger anomalies, increasing analyst workload.
+3. Agentic AI Reliability
+Incorrect reasoning or hallucinated conclusions can lead to inaccurate threat assessments..
+4. Real-Time Processing & Scalability
+High-volume events can increase latency across detection, correlation and agent investigation.
+style.visibility
+ppt_x
+ppt_y
+style.visibility
+style.visibility
+ppt_x
+ppt_y
+
+========================================
+
+=== SLIDE 5 (ppt/slides/slide5.xml) ===
+5
+ADNEXUS
+THE
+S.H.I.E.L.D
+Impacts & Benefits
+Faster Incident Response
+	Reduces investigation time by automatically correlating security events, reconstructing attack chains and identifying 	the most critical 	incidents.
+Stronger Threat Detection
+	Improves visibility into complex and multi-stage attacks by combining rule-based detection, ML anomaly detection and behavioural 	correlation.
+Modernized SOC Operations
+	Shifts SOC workflows from manual alert investigation toward 
+AI-assisted, evidence-driven and proactive threat investigation
+.
+Reduced Alert Fatigue
+	Prioritizes correlated, high-confidence threats instead of overwhelming analysts with isolated alerts and false positives.
+Explainable & Trustworthy AI
+	Provides evidence-backed explanations, event timelines and MITRE ATT&CK mappings so analysts can understand 
+why
+ a threat was 	identified.
+Automated Reporting & Response
+	Generates actionable response recommendations and structured incident reports, reducing repetitive analyst work while maintaining 	
+human-in-the-loop control
+.
+style.visibility
+ppt_x
+ppt_y
+style.visibility
+style.visibility
+style.visibility
+
+========================================
+
+=== SLIDE 6 (ppt/slides/slide6.xml) ===
+6
+ADNEXUS
+THE
+S.H.I.E.L.D
+Research & References
+Research Paper
+An LLM-Based Agentic Network Traffic Incident-Report Approach Towards Explainable-AI Network Defence
+Computers, 2026
+Focus:
+Agentic AI-driven cybersecurity, ML-based threat detection, graph-based analysis, RAG, explainable threat investigation, and automated incident reporting.
+Summary:
+The paper proposes an 
+LLM-powered multi-stage security framework
+ that combines ML threat detection, graph-based analysis, threat intelligence and RAG to investigate security incidents and generate 
+evidence-grounded, explainable incident reports
+.
+Reference Implementation:
+Agentic AI–Based Cybersecurity Investigation Platform
+A prototype implementation combining 
+security-log ingestion, ML-based threat detection, graph/event correlation, specialized AI agents, RAG-powered investigation, evidence-backed explanations, response recommendations, and automated incident-report generation
+.
+CIC-IDS2017 Dataset
+🔗 
+Canadian Institute for Cybersecurity — CIC-IDS2017
+Real-world labelled network-flow telemetry containing 
+80+ extracted traffic features
+ and diverse attack scenarios including 
+Brute Force, DoS/DDoS, Web Attacks, Infiltration, Botnet and Port Scanning
+. 
+Used as the 
+training/benchmark dataset for ADNEXUS ML-based anomaly and threat detection models
+.
+style.visibility
+
+========================================
+
+=== SLIDE 7 (ppt/slides/slide7.xml) ===
+7
+ADNEXUS
+THE
+S.H.I.E.L.D
+T
+HANK 
+Y
+OU
+
+========================================
