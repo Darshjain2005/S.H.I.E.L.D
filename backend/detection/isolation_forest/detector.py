@@ -27,14 +27,24 @@ class AnomalyDetector:
 
     def _prepare_features(self, df: pd.DataFrame) -> np.ndarray:
         """Extracts and cleans features for the Isolation Forest."""
+        # Only use numeric columns for Isolation Forest
+        df_numeric = df.select_dtypes(include=[np.number])
+        
         # Drop label columns if they exist
         drop_cols = ["Label", "BinaryLabel"]
         
         if self.feature_cols is None:
-            self.feature_cols = [c for c in df.columns if c.strip() not in [dc.strip() for dc in drop_cols]]
+            self.feature_cols = [c for c in df_numeric.columns if c.strip() not in [dc.strip() for dc in drop_cols]]
         
-        X = df[self.feature_cols].copy()
-        
+        # Ensure we only try to extract the expected feature columns
+        # If a feature is missing in the incoming df, fill it with 0
+        X = pd.DataFrame()
+        for col in self.feature_cols:
+            if col in df_numeric.columns:
+                X[col] = df_numeric[col]
+            else:
+                X[col] = 0
+                
         # Fill NaNs and replace infinities
         X.replace([np.inf, -np.inf], np.nan, inplace=True)
         X.fillna(0, inplace=True)

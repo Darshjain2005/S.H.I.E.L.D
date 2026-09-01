@@ -218,107 +218,124 @@ def _run_simulation_thread(scenario: str):
                 print(f"[SIM] WARNING: No events found for scenario '{scenario}'!")
                 return
             
-            for event in events:
+            import os
+            import pandas as pd
+            from backend.detection.isolation_forest.detector import AnomalyDetector
+            
+            anomaly_detector = AnomalyDetector()
+            model_path = os.path.join(os.path.dirname(__file__), "detection", "isolation_forest", "model.pkl")
+            if os.path.exists(model_path):
+                anomaly_detector.load(model_path)
+                print(f"[SIM] Loaded Isolation Forest model from {model_path}")
+            else:
+                print(f"[SIM] WARNING: Isolation Forest model not found at {model_path}")
+            
+            for _ in range(9999): # Infinite loop constraint
                 if not simulation_running.is_set():
-                    print("[SIM] Simulation stopped by user.")
                     break
-                
-                # 1. Save event to DB
-                try:
-                    db_event = NormalizedEvent(**event.model_dump(exclude_none=True))
-                    db.add(db_event)
-                    db.commit()
-                    events_processed += 1
-                    simulation_status["events_processed"] = events_processed
-                except Exception as e:
-                    db.rollback()
-                    print(f"[SIM] Error saving event: {e}")
-                    continue
-                
-                # 2. Rule Engine Detection
-                triggered_rules = rule_engine.evaluate_flow(event)
-                
-                detections = []
-                if triggered_rules:
-                    for rule_title in triggered_rules:
-                        detections.append({
-                            "engine": "Rule Engine",
-                            "threat_class": rule_title,
-                            "severity": event.severity or "medium",
-                            "confidence": 0.95,
-                            "evidence": f"Matched rule signature: {rule_title}"
-                        })
                     
-                    # Simulate multi-engine DiodeGuard detections
-                    if scenario == "brute_force":
-                        detections.append({
-                            "engine": "Isolation Forest",
-                            "threat_class": "UNKNOWN_ANOMALY",
-                            "severity": "medium",
-                            "confidence": 0.88,
-                            "evidence": "Statistical deviation in authentication attempts"
-                        })
-                    elif scenario == "data_exfiltration":
-                        detections.append({
-                            "engine": "GraphSAGE",
-                            "threat_class": "STRUCTURAL_ANOMALY",
-                            "severity": "critical",
-                            "confidence": 0.94,
-                            "evidence": "Anomalous external transfer graph structure"
-                        })
-                    elif scenario == "reconnaissance":
-                        detections.append({
-                            "engine": "Isolation Forest",
-                            "threat_class": "SCAN_ANOMALY",
-                            "severity": "high",
-                            "confidence": 0.91,
-                            "evidence": "Unusual connection frequency to multiple ports"
-                        })
-                else:
-                    detections = None
-                
-                # 3. Correlation
-                incident_schema = correlation_engine.process_event(event, detections)
-                
-                if incident_schema:
-                    timeline_len = len(incident_schema.event_timeline)
-                    print(f"[SIM] Incident {incident_schema.incident_id} timeline: {timeline_len} events")
+                for event in events:
+                    if not simulation_running.is_set():
+                        print("[SIM] Simulation stopped by user.")
+                        break
                     
-                    if timeline_len >= 3 and incident_schema.incident_id not in saved_incident_ids:
-                        print(f"[SIM] Incident {incident_schema.incident_id} reached threshold, running agent pipeline...")
+                    # 1. Save event to DB
+                    try:
+                        db_event = NormalizedEvent(**event.model_dump(exclude_none=True))
+                        db.add(db_event)
+                        db.commit()
+                        events_processed += 1
+                        simulation_status["events_processed"] = events_processed
+                    except Exception as e:
+                        db.rollback()
+                        print(f"[SIM] Error saving event: {e}")
+                        continue
+                    
+                    # 2. Rule Engine Detection
+                    triggered_rules = rule_engine.evaluate_flow(event)
+                    
+                    detections = []
+                    if triggered_rules:
+                        for rule_title in triggered_rules:
+                            detections.append({
+                                "engine": "Rule Engine",
+                                "threat_class": rule_title,
+                                "severity": event.severity or "medium",
+                                "confidence": 0.95,
+                                "evidence": f"Matched rule signature: {rule_title}"
+                            })
                         
-                        # 4. Agent Investigation (run async in a new event loop)
-                        try:
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            agent_orchestrator = AgentOrchestrator()
-                            enriched_incident = loop.run_until_complete(
-                                agent_orchestrator.run_investigation_pipeline(incident_schema)
-                            )
-                            loop.close()
-                        except Exception as e:
-                            print(f"[SIM] Agent pipeline error (using fallback): {e}")
-                            enriched_incident = incident_schema
-                            enriched_incident.ai_summary = f"Auto-detected {incident_schema.threat_type}. Agent analysis unavailable."
+                    # 3. Isolation Forest Anomaly Detection
+                    if anomaly_detector.is_trained:
+                        # Create a 1-row DataFrame for the model
+                        event_dict = event.model_dump(exclude_none=True)
+                        # Convert any list/dict types to string or drop them for ML
+                        flat_event = {}
+                        for k, v in event_dict.items():
+                            if isinstance(v, (int, float, bool)):
+                                flat_event[k] = v
+                                
+                        if flat_event:
+                            df_event = pd.DataFrame([flat_event])
+                            try:
+                                # predict returns a boolean Series
+                                is_anom = anomaly_detector.predict(df_event).iloc[0]
+                                if is_anom:
+                                    detections.append({
+                                        "engine": "Isolation Forest",
+                                        "threat_class": "ML_ANOMALY",
+                                        "severity": "high",
+                                        "confidence": 0.88,
+                                        "evidence": "Statistical anomaly detected in network flow characteristics"
+                                    })
+                            except Exception as e:
+                                pass # Suppress prediction prints to keep logs clean
+                    
+                    if not detections:
+                        detections = None
+                    
+                    # 4. Correlation
+                    incident_schema = correlation_engine.process_event(event, detections)
+                    
+                    if incident_schema:
+                        timeline_len = len(incident_schema.event_timeline)
+                        print(f"[SIM] Incident {incident_schema.incident_id} timeline: {timeline_len} events")
                         
-                        # 5. Risk Scoring
-                        enriched_incident.risk_score = risk_scorer.calculate_risk(enriched_incident)
-                        print(f"[SIM] Risk score: {enriched_incident.risk_score}")
-                        
-                        # 6. Save Incident to DB
-                        try:
-                            manager.create_incident(enriched_incident)
-                            saved_incident_ids.add(enriched_incident.incident_id)
-                            incidents_created += 1
-                            simulation_status["incidents_created"] = incidents_created
-                            print(f"[SIM] Incident {enriched_incident.incident_id} SAVED to DB (risk={enriched_incident.risk_score})")
-                        except Exception as e:
-                            db.rollback()
-                            print(f"[SIM] Error saving incident: {e}")
-                            traceback.print_exc()
-                
-                # Small delay between events
-                time.sleep(0.5)
+                        if timeline_len >= 3 and incident_schema.incident_id not in saved_incident_ids:
+                            print(f"[SIM] Incident {incident_schema.incident_id} reached threshold, running agent pipeline...")
+                            
+                            # 4. Agent Investigation (run async in a new event loop)
+                            try:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+                                agent_orchestrator = AgentOrchestrator()
+                                enriched_incident = loop.run_until_complete(
+                                    agent_orchestrator.run_investigation_pipeline(incident_schema)
+                                )
+                                loop.close()
+                            except Exception as e:
+                                print(f"[SIM] Agent pipeline error (using fallback): {e}")
+                                enriched_incident = incident_schema
+                                enriched_incident.ai_summary = f"Auto-detected {incident_schema.threat_type}. Agent analysis unavailable."
+                            
+                            # 5. Risk Scoring
+                            enriched_incident.risk_score = risk_scorer.calculate_risk(enriched_incident)
+                            print(f"[SIM] Risk score: {enriched_incident.risk_score}")
+                            
+                            # 6. Save Incident to DB
+                            try:
+                                manager.create_incident(enriched_incident)
+                                saved_incident_ids.add(enriched_incident.incident_id)
+                                incidents_created += 1
+                                simulation_status["incidents_created"] = incidents_created
+                                print(f"[SIM] Incident {enriched_incident.incident_id} SAVED to DB (risk={enriched_incident.risk_score})")
+                            except Exception as e:
+                                db.rollback()
+                                print(f"[SIM] Error saving incident: {e}")
+                                traceback.print_exc()
+                    
+                    # Small delay between events
+                    time.sleep(0.5)
         
         print(f"[SIM] Simulation complete. Events: {events_processed}, Incidents: {incidents_created}")
         
@@ -364,8 +381,6 @@ def get_simulation_status():
 def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     from fpdf import FPDF
     from fastapi.responses import Response
-    import textwrap
-    import re
     
     manager = IncidentManager(db)
     incident = manager.get_incident(incident_id)
@@ -382,8 +397,8 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
         }
         for k, v in replacements.items():
             text = text.replace(k, v)
-        text = text.encode('latin-1', 'replace').decode('latin-1')
-        return textwrap.fill(text, width=95, break_long_words=True, replace_whitespace=False)
+        # Clean latin-1 mapping for FPDF
+        return text.encode('latin-1', 'replace').decode('latin-1')
     
     pdf = FPDF()
     pdf.add_page()
@@ -398,10 +413,10 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, f"Incident: {incident.incident_id}", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.multi_cell(0, 6, sanitize(f"Title: {incident.title}"))
-    pdf.multi_cell(0, 6, sanitize(f"Severity: {incident.severity}  |  Risk Score: {incident.risk_score}/100  |  Status: {incident.status}"))
-    pdf.multi_cell(0, 6, sanitize(f"Threat Type: {incident.threat_type}"))
-    pdf.multi_cell(0, 6, sanitize(f"Detected At: {incident.detected_at}"))
+    pdf.write(6, sanitize(f"Title: {incident.title}\n"))
+    pdf.write(6, sanitize(f"Severity: {incident.severity}  |  Risk Score: {incident.risk_score}/100  |  Status: {incident.status}\n"))
+    pdf.write(6, sanitize(f"Threat Type: {incident.threat_type}\n"))
+    pdf.write(6, sanitize(f"Detected At: {incident.detected_at}\n"))
     pdf.ln(6)
     
     # AI Summary
@@ -409,9 +424,7 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 8, "AI Investigation Summary", ln=True)
     pdf.set_font("Helvetica", "", 10)
     summary = incident.ai_summary or "No AI summary available."
-    for line in str(summary).split('\n'):
-        if line.strip():
-            pdf.multi_cell(0, 6, sanitize(line.strip()))
+    pdf.write(6, sanitize(summary + "\n"))
     pdf.ln(4)
     
     # Affected Assets
@@ -420,9 +433,9 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.set_font("Helvetica", "", 10)
     if incident.affected_assets:
         for asset in incident.affected_assets:
-            pdf.multi_cell(0, 6, sanitize(f"  - {asset}"))
+            pdf.write(6, sanitize(f"  - {asset}\n"))
     else:
-        pdf.cell(0, 6, "  None identified", ln=True)
+        pdf.write(6, "  None identified\n")
     pdf.ln(4)
     
     # MITRE ATT&CK
@@ -431,9 +444,9 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.set_font("Helvetica", "", 10)
     if incident.mitre_mapping:
         for tactic in incident.mitre_mapping:
-            pdf.multi_cell(0, 6, sanitize(f"  - {tactic}"))
+            pdf.write(6, sanitize(f"  - {tactic}\n"))
     else:
-        pdf.cell(0, 6, "  No MITRE mapping available", ln=True)
+        pdf.write(6, "  No MITRE mapping available\n")
     pdf.ln(4)
     
     # Detection Evidence
@@ -446,9 +459,9 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
                 line = f"  {i}. [{ev.get('engine', 'N/A')}] {ev.get('threat_class', 'N/A')} (conf: {ev.get('confidence', 'N/A')})"
             else:
                 line = f"  {i}. {ev}"
-            pdf.multi_cell(0, 6, sanitize(line))
+            pdf.write(6, sanitize(line + "\n"))
     else:
-        pdf.cell(0, 6, "  No evidence recorded", ln=True)
+        pdf.write(6, "  No evidence recorded\n")
     pdf.ln(4)
     
     # Response Recommendations
@@ -457,9 +470,9 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.set_font("Helvetica", "", 10)
     if incident.response_recommendations:
         for rec in incident.response_recommendations:
-            pdf.multi_cell(0, 6, sanitize(f"  - {rec}"))
+            pdf.write(6, sanitize(f"  - {rec}\n"))
     else:
-        pdf.cell(0, 6, "  No recommendations available", ln=True)
+        pdf.write(6, "  No recommendations available\n")
     pdf.ln(4)
     
     # Event Timeline Count
@@ -467,7 +480,7 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 8, "Event Timeline", ln=True)
     pdf.set_font("Helvetica", "", 10)
     timeline_count = len(incident.event_timeline) if incident.event_timeline else 0
-    pdf.cell(0, 6, f"  Total Correlated Events: {timeline_count}", ln=True)
+    pdf.write(6, f"  Total Correlated Events: {timeline_count}\n")
     
     # Footer
     pdf.ln(10)
@@ -475,7 +488,7 @@ def get_incident_report(incident_id: str, db: Session = Depends(get_db)):
     pdf.cell(0, 6, "Generated by ADNEXUS Agentic SOC - The S.H.I.E.L.D", ln=True, align="C")
     
     try:
-        pdf_bytes = pdf.output()
+        pdf_bytes = bytes(pdf.output())
     except Exception as e:
         print(f"PDF Error: {e}")
         return Response(content=f"PDF Error: {e}", status_code=500)
