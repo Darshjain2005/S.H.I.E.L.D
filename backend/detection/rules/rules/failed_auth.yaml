@@ -1,0 +1,8 @@
+title: Failed Authentication
+id: rule-001
+description: Detects a failed authentication attempt
+level: medium
+detection:
+  selection:
+    event_type: "authentication_failed"
+  condition: selection

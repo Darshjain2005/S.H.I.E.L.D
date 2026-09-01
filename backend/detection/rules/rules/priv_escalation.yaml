@@ -1,0 +1,9 @@
+title: Privilege Escalation Indicator
+id: rule-002
+description: Detects successful sudo or administrative privilege acquisition
+level: high
+detection:
+  selection:
+    event_type: "privilege_escalation"
+    severity: "high"
+  condition: selection

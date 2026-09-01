@@ -1,0 +1,9 @@
+title: Large Data Transfer (Exfiltration Indicator)
+id: rule-004
+description: Detects large outbound data transfers indicating potential exfiltration
+level: high
+detection:
+  selection:
+    event_type: "data_transfer"
+    severity: "critical"
+  condition: selection

@@ -1,0 +1,9 @@
+title: Suspicious Outbound Connection
+id: rule-003
+description: Detects outbound connections to non-standard ports or known bad IPs
+level: medium
+detection:
+  selection:
+    event_type: "network_connection"
+    severity: "high"
+  condition: selection
