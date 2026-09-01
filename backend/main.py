@@ -86,6 +86,9 @@ def update_incident(incident_id: str, updates: dict, db: Session = Depends(get_d
 
 @app.get("/api/dashboard/stats")
 def get_dashboard_stats(db: Session = Depends(get_db)):
+    import datetime
+    from collections import defaultdict
+    
     manager = IncidentManager(db)
     incidents = manager.get_all_incidents()
     total_events = db.query(NormalizedEvent).count()
@@ -93,6 +96,31 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     
     # Calculate detections count
     detections_count = sum(len(i.evidence) if i.evidence else 0 for i in incidents)
+    
+    # Generate Real Timeline Data
+    timeline_dict = defaultdict(lambda: {"events": 0, "alerts": 0})
+    
+    # Bucket incidents by minute
+    for inc in incidents:
+        if inc.detected_at:
+            dt = datetime.datetime.fromisoformat(inc.detected_at.replace('Z', '+00:00')) if isinstance(inc.detected_at, str) else inc.detected_at
+            if dt:
+                bucket = dt.strftime("%H:%M")
+                timeline_dict[bucket]["alerts"] += 1
+                
+    # Bucket recent events (limit 500 for performance) by minute
+    recent_events = db.query(NormalizedEvent).order_by(NormalizedEvent.timestamp.desc()).limit(500).all()
+    for ev in recent_events:
+        if ev.timestamp:
+            dt = datetime.datetime.fromisoformat(ev.timestamp.replace('Z', '+00:00')) if isinstance(ev.timestamp, str) else ev.timestamp
+            if dt:
+                bucket = dt.strftime("%H:%M")
+                timeline_dict[bucket]["events"] += 1
+                
+    timeline = [{"time": k, "events": v["events"], "alerts": v["alerts"]} for k, v in sorted(timeline_dict.items())]
+    if not timeline:
+        now = datetime.datetime.now()
+        timeline = [{"time": now.strftime("%H:%M"), "events": 0, "alerts": 0}]
     
     return {
         "total_events": total_events,
@@ -102,7 +130,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             "high": sum(1 for i in incidents if i.risk_score and i.risk_score >= 80),
             "medium": sum(1 for i in incidents if i.risk_score and 40 <= i.risk_score < 80),
             "low": sum(1 for i in incidents if i.risk_score is not None and i.risk_score < 40)
-        }
+        },
+        "timeline": timeline
     }
 
 
