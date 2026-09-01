@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 import threading
 import time
 import traceback
+from datetime import datetime, timedelta
 
 from backend.core.db import get_db, engine, Base, SessionLocal
 from backend.core.config import settings
@@ -94,6 +95,48 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
     # Calculate detections count
     detections_count = sum(len(i.evidence) if i.evidence else 0 for i in incidents)
     
+    # Generate Real Timeline for Graph (Cumulative, last 15 minutes)
+    now = datetime.utcnow()
+    fifteen_mins_ago = now - timedelta(minutes=15)
+    
+    # Calculate base counts before the 15 min window
+    base_events = db.query(NormalizedEvent).filter(NormalizedEvent.timestamp < fifteen_mins_ago).count()
+    base_alerts = sum(1 for i in incidents if getattr(i, "detected_at", now) and getattr(i, "detected_at", now) < fifteen_mins_ago)
+    
+    # Fetch recent events
+    recent_events = db.query(NormalizedEvent).filter(NormalizedEvent.timestamp >= fifteen_mins_ago).all()
+    recent_incidents = [i for i in incidents if getattr(i, "detected_at", now) and getattr(i, "detected_at", now) >= fifteen_mins_ago]
+    
+    # Bucket by minute
+    timeline_dict = {}
+    for i in range(15):
+        t_bucket = (fifteen_mins_ago + timedelta(minutes=i)).strftime("%H:%M")
+        timeline_dict[t_bucket] = {"time": t_bucket, "events": 0, "alerts": 0}
+        
+    for ev in recent_events:
+        t_str = ev.timestamp.strftime("%H:%M")
+        if t_str in timeline_dict:
+            timeline_dict[t_str]["events"] += 1
+            
+    for inc in recent_incidents:
+        if getattr(inc, "detected_at", None):
+            t_str = inc.detected_at.strftime("%H:%M")
+            if t_str in timeline_dict:
+                timeline_dict[t_str]["alerts"] += 1
+                
+    # Transform to cumulative list
+    timeline_list = []
+    current_events = base_events
+    current_alerts = base_alerts
+    for t_bucket, counts in timeline_dict.items():
+        current_events += counts["events"]
+        current_alerts += counts["alerts"]
+        timeline_list.append({
+            "time": t_bucket,
+            "events": current_events,
+            "alerts": current_alerts
+        })
+    
     return {
         "total_events": total_events,
         "active_incidents": active_incidents,
@@ -102,7 +145,8 @@ def get_dashboard_stats(db: Session = Depends(get_db)):
             "high": sum(1 for i in incidents if i.risk_score and i.risk_score >= 80),
             "medium": sum(1 for i in incidents if i.risk_score and 40 <= i.risk_score < 80),
             "low": sum(1 for i in incidents if i.risk_score is not None and i.risk_score < 40)
-        }
+        },
+        "timeline": timeline_list
     }
 
 

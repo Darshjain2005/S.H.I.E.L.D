@@ -20,8 +20,8 @@ export default {
       },
       fontFamily: {
         mono: ['"Fira Code"', 'monospace'],
-        display: ['"Orbitron"', 'sans-serif'],
-        body: ['"Rajdhani"', 'sans-serif'],
+        display: ['"Outfit"', 'sans-serif'],
+        body: ['"Inter"', 'sans-serif'],
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',

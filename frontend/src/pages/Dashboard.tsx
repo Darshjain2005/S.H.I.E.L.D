@@ -2,17 +2,8 @@ import { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ShieldAlert, Activity, Crosshair, Server } from 'lucide-react';
 import { getDashboardStats, getIncidents, startSimulation } from '../services/api';
-import type { DashboardStats, SecurityIncident } from '../types';
+import type { SecurityIncident } from '../types';
 
-const mockData = [
-  { time: '10:00', events: 120, alerts: 2 },
-  { time: '10:05', events: 250, alerts: 5 },
-  { time: '10:10', events: 380, alerts: 12 },
-  { time: '10:15', events: 150, alerts: 1 },
-  { time: '10:20', events: 180, alerts: 3 },
-  { time: '10:25', events: 450, alerts: 18 },
-  { time: '10:30', events: 200, alerts: 0 },
-];
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>({
@@ -89,7 +80,7 @@ export default function Dashboard() {
       <div className="glass-panel p-6 h-96 bracket-panel">
         <h2 className="text-xl font-display mb-4 text-gray-300">THREAT VOLUME OVER TIME</h2>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={mockData}>
+          <AreaChart data={stats?.timeline || []} margin={{ top: 20, right: 30, left: 10, bottom: 20 }}>
             <defs>
               <linearGradient id="colorEvents" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#00f3ff" stopOpacity={0.8}/>
@@ -100,15 +91,15 @@ export default function Dashboard() {
                 <stop offset="95%" stopColor="#ff003c" stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#151e32" />
-            <XAxis dataKey="time" stroke="#4b5563" />
-            <YAxis stroke="#4b5563" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#151e32" vertical={false} />
+            <XAxis dataKey="time" stroke="#4b5563" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} tickMargin={10} />
+            <YAxis stroke="#4b5563" tickLine={false} axisLine={false} tick={{ fontSize: 12 }} width={55} tickMargin={10} />
             <Tooltip 
-              contentStyle={{ backgroundColor: '#0c1120', borderColor: '#00f3ff', color: '#fff' }}
+              contentStyle={{ backgroundColor: 'rgba(12, 17, 32, 0.9)', borderColor: '#00f3ff', color: '#fff', borderRadius: '12px', backdropFilter: 'blur(8px)' }}
               itemStyle={{ color: '#00f3ff' }}
             />
-            <Area type="monotone" dataKey="events" stroke="#00f3ff" fillOpacity={1} fill="url(#colorEvents)" />
-            <Area type="monotone" dataKey="alerts" stroke="#ff003c" fillOpacity={1} fill="url(#colorAlerts)" />
+            <Area type="natural" dataKey="events" stroke="#00f3ff" strokeWidth={3} fillOpacity={1} fill="url(#colorEvents)" activeDot={{ r: 6, fill: '#00f3ff', stroke: '#0c1120', strokeWidth: 2 }} />
+            <Area type="natural" dataKey="alerts" stroke="#ff003c" strokeWidth={3} fillOpacity={1} fill="url(#colorAlerts)" activeDot={{ r: 6, fill: '#ff003c', stroke: '#0c1120', strokeWidth: 2 }} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -165,13 +156,13 @@ export default function Dashboard() {
 
 function KPICard({ title, value, icon, color }: { title: string, value: string, icon: React.ReactNode, color: string }) {
   return (
-    <div className="glass-panel p-5 flex items-center gap-4 border-l-4" style={{ borderLeftColor: 'currentColor' }}>
-      <div className={`p-3 rounded-lg bg-gray-900 ${color}`}>
+    <div className={`glass-panel px-6 py-4 flex items-center gap-5 rounded-full ${color}`}>
+      <div className={`p-4 rounded-full bg-gray-900/50 shadow-inner`}>
         {icon}
       </div>
       <div>
-        <p className="text-sm text-gray-400 font-mono">{title}</p>
-        <p className="text-2xl font-bold font-display tracking-wider">{value}</p>
+        <p className="text-xs text-gray-400 font-mono tracking-widest">{title}</p>
+        <p className="text-2xl font-bold font-display tracking-wider text-gray-100">{value}</p>
       </div>
     </div>
   );
