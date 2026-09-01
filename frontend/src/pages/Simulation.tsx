@@ -70,7 +70,7 @@ export default function Simulation() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <ScenarioCard 
           title="BRUTE FORCE"
           description="Simulates a credential stuffing attack against SSH (port 22) followed by a successful login."
@@ -88,6 +88,12 @@ export default function Simulation() {
           description="Simulates a large outbound data transfer resembling theft of sensitive database files."
           icon={<Database className="w-8 h-8 text-cyber-neonRed" />}
           onStart={() => handleStart('exfiltration')}
+        />
+        <ScenarioCard 
+          title="CIC-IDS2017 (DIODEGUARD)"
+          description="Runs the full DiodeGuard machine learning pipeline on actual network flow metrics."
+          icon={<Database className="w-8 h-8 text-cyber-neonGreen" />}
+          onStart={() => handleStart('cic_ids2017')}
         />
       </div>
     </div>

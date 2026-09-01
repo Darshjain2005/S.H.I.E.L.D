@@ -127,90 +127,169 @@ def _run_simulation_thread(scenario: str):
     
     try:
         print(f"[SIM] Starting scenario: {scenario}")
-        events = replayer.get_scenario_events(scenario)
-        print(f"[SIM] Loaded {len(events)} events from scenario '{scenario}'")
         
-        if not events:
-            print(f"[SIM] WARNING: No events found for scenario '{scenario}'!")
-            print(f"[SIM] Looking in: {replayer.logs_dir / scenario / 'scenario.jsonl'}")
-            return
-        
-        for event in events:
-            if not simulation_running.is_set():
-                print("[SIM] Simulation stopped by user.")
-                break
+        if scenario == "cic_ids2017":
+            from backend.cic_ids_runner import CICIDSRunner
+            dataset_path = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), '..', 'DiodeGuard', 'datasets', 'combinenew.csv'))
+            runner = CICIDSRunner(dataset_path)
+            runner.setup_ml()
+            event_stream = runner.stream_and_detect(start_idx=2000, count=500)
             
-            # 1. Save event to DB
-            try:
-                db_event = NormalizedEvent(**event.model_dump(exclude_none=True))
-                db.add(db_event)
-                db.commit()
-                events_processed += 1
-                simulation_status["events_processed"] = events_processed
-            except Exception as e:
-                db.rollback()
-                print(f"[SIM] Error saving event: {e}")
-                continue
-            
-            # 2. Rule Engine Detection
-            triggered_rules = rule_engine.evaluate_flow(event)
-            
-            detections = []
-            if triggered_rules:
-                for rule_title in triggered_rules:
-                    detections.append({
-                        "engine": "rule_engine",
-                        "threat_class": rule_title,
-                        "severity": event.severity or "medium",
-                        "confidence": 0.9,
-                        "evidence": f"Matched pattern for {rule_title}"
-                    })
-                print(f"[SIM] Event {events_processed}: Rules triggered: {triggered_rules}")
-            else:
-                detections = None
-            
-            # 3. Correlation
-            incident_schema = correlation_engine.process_event(event, detections)
-            
-            if incident_schema:
-                timeline_len = len(incident_schema.event_timeline)
-                print(f"[SIM] Incident {incident_schema.incident_id} timeline: {timeline_len} events")
+            for event, detections in event_stream:
+                if not simulation_running.is_set():
+                    break
                 
-                if timeline_len >= 3 and incident_schema.incident_id not in saved_incident_ids:
-                    print(f"[SIM] Incident {incident_schema.incident_id} reached threshold, running agent pipeline...")
+                # Save event
+                try:
+                    db_event = NormalizedEvent(**event.model_dump(exclude_none=True))
+                    db.add(db_event)
+                    db.commit()
+                    events_processed += 1
+                    simulation_status["events_processed"] = events_processed
+                except Exception as e:
+                    db.rollback()
+                    continue
                     
-                    # 4. Agent Investigation (run async in a new event loop)
-                    try:
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        agent_orchestrator = AgentOrchestrator()
-                        enriched_incident = loop.run_until_complete(
-                            agent_orchestrator.run_investigation_pipeline(incident_schema)
-                        )
-                        loop.close()
-                    except Exception as e:
-                        print(f"[SIM] Agent pipeline error (using fallback): {e}")
-                        enriched_incident = incident_schema
-                        enriched_incident.ai_summary = f"Auto-detected {incident_schema.threat_type}. Agent analysis unavailable."
+                incident_schema = correlation_engine.process_event(event, detections)
+                
+                if incident_schema:
+                    timeline_len = len(incident_schema.event_timeline)
                     
-                    # 5. Risk Scoring
-                    enriched_incident.risk_score = risk_scorer.calculate_risk(enriched_incident)
-                    print(f"[SIM] Risk score: {enriched_incident.risk_score}")
-                    
-                    # 6. Save Incident to DB
-                    try:
-                        manager.create_incident(enriched_incident)
-                        saved_incident_ids.add(enriched_incident.incident_id)
-                        incidents_created += 1
-                        simulation_status["incidents_created"] = incidents_created
-                        print(f"[SIM] Incident {enriched_incident.incident_id} SAVED to DB (risk={enriched_incident.risk_score})")
-                    except Exception as e:
-                        db.rollback()
-                        print(f"[SIM] Error saving incident: {e}")
-                        traceback.print_exc()
+                    if timeline_len >= 3 and incident_schema.incident_id not in saved_incident_ids:
+                        print(f"[SIM] Incident {incident_schema.incident_id} reached threshold, running agent pipeline...")
+                        try:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            agent_orchestrator = AgentOrchestrator()
+                            enriched_incident = loop.run_until_complete(
+                                agent_orchestrator.run_investigation_pipeline(incident_schema)
+                            )
+                            loop.close()
+                        except Exception as e:
+                            enriched_incident = incident_schema
+                            enriched_incident.ai_summary = f"Auto-detected {incident_schema.threat_type}. Agent analysis unavailable."
+                        
+                        enriched_incident.risk_score = risk_scorer.calculate_risk(enriched_incident)
+                        
+                        try:
+                            manager.create_incident(enriched_incident)
+                            saved_incident_ids.add(enriched_incident.incident_id)
+                            incidents_created += 1
+                            simulation_status["incidents_created"] = incidents_created
+                            print(f"[SIM] Incident {enriched_incident.incident_id} SAVED to DB (risk={enriched_incident.risk_score})")
+                        except Exception as e:
+                            db.rollback()
+                time.sleep(0.1)
+                
+        else:
+            events = replayer.get_scenario_events(scenario)
+            print(f"[SIM] Loaded {len(events)} events from scenario '{scenario}'")
             
-            # Small delay between events
-            time.sleep(0.5)
+            if not events:
+                print(f"[SIM] WARNING: No events found for scenario '{scenario}'!")
+                return
+            
+            for event in events:
+                if not simulation_running.is_set():
+                    print("[SIM] Simulation stopped by user.")
+                    break
+                
+                # 1. Save event to DB
+                try:
+                    db_event = NormalizedEvent(**event.model_dump(exclude_none=True))
+                    db.add(db_event)
+                    db.commit()
+                    events_processed += 1
+                    simulation_status["events_processed"] = events_processed
+                except Exception as e:
+                    db.rollback()
+                    print(f"[SIM] Error saving event: {e}")
+                    continue
+                
+                # 2. Rule Engine Detection
+                triggered_rules = rule_engine.evaluate_flow(event)
+                
+                detections = []
+                if triggered_rules:
+                    for rule_title in triggered_rules:
+                        detections.append({
+                            "engine": "Rule Engine",
+                            "threat_class": rule_title,
+                            "severity": event.severity or "medium",
+                            "confidence": 0.95,
+                            "evidence": f"Matched rule signature: {rule_title}"
+                        })
+                    
+                    # Simulate multi-engine DiodeGuard detections
+                    if scenario == "brute_force":
+                        detections.append({
+                            "engine": "Isolation Forest",
+                            "threat_class": "UNKNOWN_ANOMALY",
+                            "severity": "medium",
+                            "confidence": 0.88,
+                            "evidence": "Statistical deviation in authentication attempts"
+                        })
+                    elif scenario == "data_exfiltration":
+                        detections.append({
+                            "engine": "GraphSAGE",
+                            "threat_class": "STRUCTURAL_ANOMALY",
+                            "severity": "critical",
+                            "confidence": 0.94,
+                            "evidence": "Anomalous external transfer graph structure"
+                        })
+                    elif scenario == "reconnaissance":
+                        detections.append({
+                            "engine": "Isolation Forest",
+                            "threat_class": "SCAN_ANOMALY",
+                            "severity": "high",
+                            "confidence": 0.91,
+                            "evidence": "Unusual connection frequency to multiple ports"
+                        })
+                else:
+                    detections = None
+                
+                # 3. Correlation
+                incident_schema = correlation_engine.process_event(event, detections)
+                
+                if incident_schema:
+                    timeline_len = len(incident_schema.event_timeline)
+                    print(f"[SIM] Incident {incident_schema.incident_id} timeline: {timeline_len} events")
+                    
+                    if timeline_len >= 3 and incident_schema.incident_id not in saved_incident_ids:
+                        print(f"[SIM] Incident {incident_schema.incident_id} reached threshold, running agent pipeline...")
+                        
+                        # 4. Agent Investigation (run async in a new event loop)
+                        try:
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            agent_orchestrator = AgentOrchestrator()
+                            enriched_incident = loop.run_until_complete(
+                                agent_orchestrator.run_investigation_pipeline(incident_schema)
+                            )
+                            loop.close()
+                        except Exception as e:
+                            print(f"[SIM] Agent pipeline error (using fallback): {e}")
+                            enriched_incident = incident_schema
+                            enriched_incident.ai_summary = f"Auto-detected {incident_schema.threat_type}. Agent analysis unavailable."
+                        
+                        # 5. Risk Scoring
+                        enriched_incident.risk_score = risk_scorer.calculate_risk(enriched_incident)
+                        print(f"[SIM] Risk score: {enriched_incident.risk_score}")
+                        
+                        # 6. Save Incident to DB
+                        try:
+                            manager.create_incident(enriched_incident)
+                            saved_incident_ids.add(enriched_incident.incident_id)
+                            incidents_created += 1
+                            simulation_status["incidents_created"] = incidents_created
+                            print(f"[SIM] Incident {enriched_incident.incident_id} SAVED to DB (risk={enriched_incident.risk_score})")
+                        except Exception as e:
+                            db.rollback()
+                            print(f"[SIM] Error saving incident: {e}")
+                            traceback.print_exc()
+                
+                # Small delay between events
+                time.sleep(0.5)
         
         print(f"[SIM] Simulation complete. Events: {events_processed}, Incidents: {incidents_created}")
         

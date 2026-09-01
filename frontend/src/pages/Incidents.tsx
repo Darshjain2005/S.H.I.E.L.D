@@ -39,8 +39,8 @@ export default function Incidents() {
     }
   };
 
-  const downloadReport = (id: string) => {
-    window.open(`http://localhost:8000/api/incidents/${id}/report`, '_blank');
+  const downloadReport = (incident_id: string) => {
+    window.open(`http://localhost:8000/api/incidents/${incident_id}/report`, '_blank');
   };
 
   return (
@@ -85,7 +85,7 @@ export default function Incidents() {
                 <div className="lg:col-span-2 space-y-6">
                   <div>
                     <h4 className="text-cyber-neonPurple font-display text-sm mb-2">AI SUMMARY (AGENT FINDINGS)</h4>
-                    <p className="text-sm text-gray-300 bg-gray-900/50 p-3 border-l-2 border-cyber-neonPurple rounded">{inc.agent_findings || inc.ai_summary || "No summary available."}</p>
+                    <p className="text-sm text-gray-300 bg-gray-900/50 p-3 border-l-2 border-cyber-neonPurple rounded">{inc.ai_summary || "No summary available."}</p>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
@@ -98,8 +98,8 @@ export default function Incidents() {
                     <div>
                       <h4 className="text-gray-400 font-display text-sm mb-2">MITRE ATT&CK</h4>
                       <div className="flex flex-wrap gap-2">
-                        {inc.mitre_mapping ? Object.keys(inc.mitre_mapping).map(k => (
-                          <span key={k} className="px-2 py-1 text-xs bg-gray-800 border border-gray-600 rounded">{k}</span>
+                        {inc.mitre_mapping && inc.mitre_mapping.length > 0 ? inc.mitre_mapping.map((k, i) => (
+                          <span key={i} className="px-2 py-1 text-xs bg-gray-800 border border-gray-600 rounded">{typeof k === 'string' ? k : JSON.stringify(k)}</span>
                         )) : <span className="text-sm text-gray-500">Unmapped</span>}
                       </div>
                     </div>
@@ -109,7 +109,9 @@ export default function Incidents() {
                     <h4 className="text-cyber-neonCyan font-display text-sm mb-2">EVENT TIMELINE</h4>
                     <div className="space-y-2 max-h-40 overflow-y-auto">
                       {inc.event_timeline?.map((evt, i) => (
-                        <div key={i} className="text-xs font-mono text-gray-400 bg-gray-900 p-2 rounded truncate">{evt}</div>
+                        <div key={i} className="text-xs font-mono text-gray-400 bg-gray-900 p-2 rounded truncate">
+                          {typeof evt === 'string' ? evt : `${evt.timestamp || ''} | ${evt.event_type || 'Unknown'} | ${evt.src_ip || 'N/A'} -> ${evt.dst_ip || 'N/A'}`}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -117,7 +119,7 @@ export default function Incidents() {
                   <div>
                     <h4 className="text-cyber-neonGreen font-display text-sm mb-2">RESPONSE RECOMMENDATIONS</h4>
                     <ul className="list-disc pl-4 text-sm text-gray-300">
-                      {inc.response_recommendations?.map((r, i) => <li key={i}>{r}</li>) || <li>Pending automated analysis</li>}
+                      {inc.response_recommendations?.map((r, i) => <li key={i}>{typeof r === 'string' ? r : JSON.stringify(r)}</li>) || <li>Pending automated analysis</li>}
                     </ul>
                   </div>
                 </div>
@@ -148,7 +150,7 @@ export default function Incidents() {
                   </div>
 
                   <button 
-                    onClick={() => downloadReport(inc.id)}
+                    onClick={() => downloadReport(inc.incident_id)}
                     className="w-full neon-button flex justify-center items-center gap-2"
                   >
                     <Download className="w-4 h-4" /> EXPORT REPORT

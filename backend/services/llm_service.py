@@ -20,7 +20,7 @@ class LLMService:
             return self._mock_response(prompt, use_json)
             
     async def _call_gemini(self, prompt: str, system_instruction: str, use_json: bool) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={self.gemini_api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={self.gemini_api_key}"
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
@@ -34,7 +34,16 @@ class LLMService:
             response = await client.post(url, json=payload, timeout=30.0)
             response.raise_for_status()
             data = response.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if use_json:
+                if text.startswith("```json"):
+                    text = text[7:]
+                elif text.startswith("```"):
+                    text = text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                text = text.strip()
+            return text
             
     async def _call_groq(self, prompt: str, system_instruction: str, use_json: bool) -> str:
         url = "https://api.groq.com/openai/v1/chat/completions"
