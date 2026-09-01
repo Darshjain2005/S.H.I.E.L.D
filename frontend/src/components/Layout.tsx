@@ -1,9 +1,9 @@
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  Shield, 
-  Activity, 
-  AlertTriangle, 
-  Terminal, 
+import {
+  Shield,
+  Activity,
+  AlertTriangle,
+  Terminal,
   Database,
   Menu,
   Play
@@ -69,33 +69,32 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-cyber-neonPurple/10 blur-[120px] pointer-events-none"></div>
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`relative transition-all ${isResizing ? 'duration-0' : 'duration-300 ease-in-out'} flex-shrink-0 border-r border-cyber-neonCyan/20 bg-cyber-panel/30 backdrop-blur-md flex flex-col z-10`}
         style={{ width: sidebarOpen ? sidebarWidth : 80 }}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-cyber-neonCyan/20 overflow-hidden">
           <div className={`flex items-center gap-2 text-cyber-neonCyan transition-all duration-300 ${sidebarOpen ? 'opacity-100 w-auto' : 'opacity-0 w-0 hidden'}`}>
             <Shield className="w-6 h-6 min-w-[24px]" />
-            <span className="font-display font-bold tracking-wider whitespace-nowrap">AGENTIC SOC</span>
+            <span className="font-display font-bold tracking-wider whitespace-nowrap">ADNEXUS</span>
           </div>
-          <button 
-            onClick={() => setSidebarOpen(!sidebarOpen)} 
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
             className={`text-gray-400 hover:text-cyber-neonCyan transition-all duration-300 p-1.5 rounded-lg hover:bg-cyber-neonCyan/10 ${!sidebarOpen ? 'mx-auto' : ''}`}
           >
             <Menu className="w-6 h-6" />
           </button>
         </div>
-        
+
         <nav className="p-4 space-y-2 flex-1 overflow-x-hidden">
           {navItems.map((item) => (
             <Link
               key={item.path}
               to={item.path}
-              className={`flex items-center p-3 rounded-xl transition-all duration-200 group ${
-                location.pathname === item.path 
-                  ? 'bg-cyber-neonCyan/10 border border-cyber-neonCyan/30 text-cyber-neonCyan shadow-[0_0_10px_rgba(0,243,255,0.2)]' 
+              className={`flex items-center p-3 rounded-xl transition-all duration-200 group ${location.pathname === item.path
+                  ? 'bg-cyber-neonCyan/10 border border-cyber-neonCyan/30 text-cyber-neonCyan shadow-[0_0_10px_rgba(0,243,255,0.2)]'
                   : 'border border-transparent text-gray-400 hover:text-cyber-neonCyan hover:bg-cyber-neonCyan/5'
-              }`}
+                }`}
               title={!sidebarOpen ? item.name : undefined}
             >
               {item.icon}
@@ -105,10 +104,10 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        
+
         {/* Resize Handle */}
         {sidebarOpen && (
-          <div 
+          <div
             className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-cyber-neonCyan/50 active:bg-cyber-neonCyan z-50 transition-colors"
             onMouseDown={handleMouseDown}
           ></div>
@@ -126,7 +125,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
         </div>
-        
+
         <div className="p-8 pb-20 max-w-[1600px] mx-auto">
           {children}
         </div>
