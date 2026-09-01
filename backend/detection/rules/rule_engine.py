@@ -52,11 +52,18 @@ class RuleEngine:
             # Direct match
             return value == condition_str
 
-    def evaluate_flow(self, flow: dict) -> list:
+    def evaluate_flow(self, flow) -> list:
         """
         Evaluates a single network flow against all loaded rules.
         Returns a list of triggered rule titles.
         """
+        if hasattr(flow, "model_dump"):
+            flow_dict = flow.model_dump(exclude_none=True)
+        elif hasattr(flow, "dict"):
+            flow_dict = flow.dict(exclude_none=True)
+        else:
+            flow_dict = flow
+            
         triggered_rules = []
         
         for rule in self.rules:
@@ -74,7 +81,7 @@ class RuleEngine:
                         # We need to match the key exactly to the dataset column name
                         # Our dataset columns might have leading spaces, so we strip them for comparison
                         flow_val = None
-                        for f_key, f_val in flow.items():
+                        for f_key, f_val in flow_dict.items():
                             if str(f_key).strip() == str(key).strip():
                                 flow_val = f_val
                                 break
@@ -98,7 +105,7 @@ class RuleEngine:
                             # Evaluate this block
                             for key, condition in detection_block[part].items():
                                 flow_val = None
-                                for f_key, f_val in flow.items():
+                                for f_key, f_val in flow_dict.items():
                                     if str(f_key).strip() == str(key).strip():
                                         flow_val = f_val
                                         break

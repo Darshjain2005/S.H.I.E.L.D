@@ -20,7 +20,7 @@ class LLMService:
             return self._mock_response(prompt, use_json)
             
     async def _call_gemini(self, prompt: str, system_instruction: str, use_json: bool) -> str:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={self.gemini_api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={self.gemini_api_key}"
         
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],

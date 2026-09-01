@@ -33,9 +33,13 @@ class CorrelationEngine:
         
         if matched_incident:
             # Update
-            matched_incident['events'].append(event.model_dump())
+            matched_incident['events'].append(event.model_dump(mode='json'))
             matched_incident['detections'].extend(detections)
             matched_incident['last_seen'] = event.timestamp
+            
+            # Update the underlying Pydantic schema so main.py sees the length change
+            matched_incident['incident'].event_timeline.append(event.model_dump(mode='json'))
+            matched_incident['incident'].evidence.extend([d for d in detections if d not in matched_incident['incident'].evidence])
             
             # Escalate severity if needed
             current_sev_val = max_severity_val.get(matched_incident['incident'].severity, 1)
@@ -55,7 +59,7 @@ class CorrelationEngine:
                 risk_score=0,  # Will be updated by risk scorer
                 affected_assets=[event.dst_ip] if event.dst_ip else [],
                 source_indicators=[event.src_ip] if event.src_ip else [],
-                event_timeline=[event.model_dump()],
+                event_timeline=[event.model_dump(mode='json')],
                 evidence=detections
             )
             
@@ -65,7 +69,7 @@ class CorrelationEngine:
             
             self.active_incidents[new_incident.incident_id] = {
                 "incident": new_incident,
-                "events": [event.model_dump()],
+                "events": [event.model_dump(mode='json')],
                 "detections": detections,
                 "first_seen": event.timestamp,
                 "last_seen": event.timestamp,

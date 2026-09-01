@@ -29,4 +29,8 @@ async def query_assistant(request: ChatRequest):
         reply = await llm_service.analyze(context, system_prompt, use_json=False)
         return ChatResponse(reply=reply)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        if hasattr(e, 'response') and hasattr(e.response, 'text'):
+            error_msg = e.response.text
+        print(f"Assistant Error: {error_msg}")
+        return ChatResponse(reply=f"AI Assistant Error: Please check your API key. (Details: {error_msg[:100]}...)")

@@ -5,7 +5,8 @@ import {
   AlertTriangle, 
   Terminal, 
   Database,
-  Menu
+  Menu,
+  Play
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -18,6 +19,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { name: 'Live Events', path: '/events', icon: <Database className="w-5 h-5" /> },
     { name: 'Incidents', path: '/incidents', icon: <AlertTriangle className="w-5 h-5" /> },
     { name: 'AI Assistant', path: '/assistant', icon: <Terminal className="w-5 h-5" /> },
+    { name: 'Simulation', path: '/simulation', icon: <Play className="w-5 h-5" /> },
   ];
 
   return (
