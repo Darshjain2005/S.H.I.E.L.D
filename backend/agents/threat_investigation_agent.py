@@ -15,9 +15,10 @@ class ThreatInvestigationAgent:
             "attack_stage": "string (e.g. Reconnaissance, Initial Access, Execution, Exfiltration)",
             "affected_assets": ["string"],
             "reasoning": "string (narrative of the attack)",
-            "mitre_tactics": ["string (e.g. TA0006: Credential Access)"],
+            "mitre_tactics": ["string (MUST map to at least one MITRE ATT&CK tactic/technique if anomalous, e.g. T1110 Brute Force)"],
             "recommended_actions": ["string (specific commands or actions)"]
         }
+        IMPORTANT: NEVER leave mitre_tactics empty unless you are 100% certain the traffic is completely benign.
         """
         
     async def investigate(self, log_analysis_findings: Dict, event_timeline: List[Dict]) -> Dict[str, Any]:
